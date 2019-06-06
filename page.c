@@ -4,43 +4,25 @@
 
 #define NUM 15
 
-void op(char *in, int num) {
-	char *addr;
+FILE *fp, *ft;
 
-	int mask = 15; //0xf
+void op(char *in, int num) {
+	char *addr, *b = malloc(65);
 
 	strtok(in, "x");
 	addr = strtok(NULL, "x");
-//	printf("%s\n", addr);
 
-	size_t len = strlen(addr);
-//	printf("%lu\n", len);
-	char *b = malloc((len - 1) * 8 + 1);
-	char *p, *s = b;
-/*
-	b[0] = '\0';
-	for(size_t i = 0; i < len - 1; ++i) {
-		char c = addr[i];
-		for(int j = 7; j >= 0; --j) {
-			if(!(c & 1 << j)) strcat(b, "0");
-			else strcat(b, "1");
-		}
-	}*/
+	int i = 0;
+	unsigned int mask = 0, binary = (unsigned int)strtol(addr, NULL, 16);
 
-	for(p = addr; *p != '\0'; ++p)
-		for(int i = 7; i >= 0; --i, b++)
-			*b = (*p & (1 << i)) ? '1' : '0';
+	for(i = 0; i < num; ++i) mask = (mask << 1) + 1;
 
-	*b = '\0';
-	b = s;
-
-	printf("%s\n", b);
+	fprintf(ft, "%-10u%-10u\n", binary >> num, binary & mask);
 
 	return;
 }
 
 int main(int argc, char **argv) {
-	FILE *fp;
 	char buf[NUM];
 	int l;
 
@@ -49,15 +31,23 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
+	if((ft = fopen("group11_ans.txt", "w")) == NULL) {
+		perror("Fail to create the file!\n");
+		exit(1);
+	}
+
 	while(fgets(buf, NUM, fp) != NULL) {
 		l = strlen(buf);
-		buf[l] = '\0';
+		buf[l - 1] = '\0';
 		if(argc == 3) op(buf, atoi(argv[2]));
 		else {
 			perror("Argument count error!\n");
 			exit(1);
 		}
 	}
+
+	fclose(fp);
+	fclose(ft);
 
 	return 0;
 }
