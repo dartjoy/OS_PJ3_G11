@@ -7,7 +7,7 @@
 FILE *fp, *ft;
 
 void op(char *in, int num) {
-	char *addr, *b = malloc(65);
+	char *addr;
 
 	strtok(in, "x");
 	addr = strtok(NULL, "x");
