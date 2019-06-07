@@ -17,6 +17,7 @@ typedef struct {
 	long lru;
 }cache_line;
 
+unsigned s, b;
 unsigned S, E, B;
 bool v;
 unsigned h, m, e;
@@ -26,17 +27,22 @@ long t;
 
 void revise(int s_index, int e_index, unsigned long addr) {
 	cache[s_index][e_index].valid = true;
-	cache[s_index][e_index].start = (addr / B) * B;
+	cache[s_index][e_index].start = (addr >> b) << b;
 	cache[s_index][e_index].end = cache[s_index][e_index].start + (B - 1);
 	cache[s_index][e_index].lru = t;
 }
 
 int find_s_index(unsigned long addr) {
-	int s_index = addr / B;
-	if (s_index >= S)
-		s_index = s_index % S;
+	int idx = addr >> b;
+	int mask = 0;
 
-	return s_index;
+	for (int i = 0; i < s; ++i)
+		mask = (mask << 1) + 1;
+
+	if (idx >= S)
+		idx &= mask;
+
+	return idx;
 }
 
 int find_e_index(unsigned long addr, int size) {
@@ -58,13 +64,13 @@ int find_unsed_e_index(unsigned long addr, int size) {
 	cache_line *tgt_set = cache[s_index];
 
 	for (int i = 0; i < E; i++)
-		if (!tgt_set[i].valid) return i;
+		if (!tgt_set[i].valid)
+			return i;
 
 	return -1;
 }
 
-char *save_data(unsigned long addr, int size)
-{
+char *save_data(unsigned long addr, int size) {
 	char *res;
 	int s_index = find_s_index(addr);
 	int e_index = find_e_index(addr, size);
@@ -112,6 +118,7 @@ char *load_data(unsigned long addr, int size) {
 			e += 1;
 		}
 	}
+
 	revise(s_index, e_index, addr);
 	return res;
 }
@@ -120,17 +127,20 @@ void cache_instr(char id, unsigned long addr, int size) {
 	switch (id) {
 		case 'S': {
 			char *res = load_data(addr, size);
-			if (v) printf("%c %lx,%d %s \n", id, addr, size, res);
+			if (v)
+				printf("%c %lx,%d %s \n", id, addr, size, res);
 			break;
 		}
 		case 'M': {
 			char *load = load_data(addr, size), *save = save_data(addr, size);
-			if (v) printf("%c %lx,%d %s %s \n", id, addr, size, load, save);
+			if (v)
+				printf("%c %lx,%d %s %s \n", id, addr, size, load, save);
 			break;
 		}
 		case 'L': {
 			char *res = load_data(addr, size);
-			if (v) printf("%c %lx,%d %s \n", id, addr, size, res);
+			if (v)
+				printf("%c %lx,%d %s \n", id, addr, size, res);
 			break;
 		}
 	}
@@ -156,7 +166,6 @@ void usage() {
 
 int main(int argc, char **argv) {
 	int opt;
-	unsigned s, b;
 
 	v = false;
 	h = 0;
