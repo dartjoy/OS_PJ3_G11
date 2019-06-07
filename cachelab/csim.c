@@ -1,8 +1,8 @@
 #include "cachelab.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <getopt.h>
 #include <string.h>
+#include <getopt.h>
 #include <math.h>
 #include <time.h>
 
@@ -15,67 +15,69 @@ typedef struct {
 	long start;
 	long end;
 	long lru;
-}cache_line;
+} cache_blk;
 
 unsigned s, b;
 unsigned S, E, B;
 bool v;
 unsigned h, m, e;
 char *file_name;
-cache_line **cache;
+cache_blk **cache;
 long t;
 
-void revise(int s_index, int e_index, unsigned long addr) {
-	cache[s_index][e_index].valid = true;
-	cache[s_index][e_index].start = (addr >> b) << b;
-	cache[s_index][e_index].end = cache[s_index][e_index].start + (B - 1);
-	cache[s_index][e_index].lru = t;
+void revise(int s_idx, int e_idx, unsigned long addr) {
+	cache[s_idx][e_idx].valid = true;
+	cache[s_idx][e_idx].start = (addr >> b) << b;
+	cache[s_idx][e_idx].end = cache[s_idx][e_idx].start + B - 1;
+	cache[s_idx][e_idx].lru = t;
 }
 
-int find_s_index(unsigned long addr) {
+int get_s_idx(unsigned long addr) {
 	int idx = addr >> b;
-	int mask = 0;
 
-	for (int i = 0; i < s; ++i)
-		mask = (mask << 1) + 1;
+	if (idx >= S) {
+		int mask = 0;
 
-	if (idx >= S)
+		for (int i = 0; i < s; ++i)
+			mask = (mask << 1) + 1;
+
 		idx &= mask;
+	}
 
 	return idx;
 }
 
-int find_e_index(unsigned long addr, int size) {
-	int s_index = find_s_index(addr);
-	cache_line *tgt_set = cache[s_index];
+int get_e_idx(unsigned long addr, int size) {
+	int s_idx = get_s_idx(addr);
+	cache_blk *tgt_set = cache[s_idx];
 
-	for (int i = 0; i < E; i++) {
-		cache_line block = tgt_set[i];
+	for (int i = 0; i < E; ++i) {
+		cache_blk tmp = tgt_set[i];
 
-		if (block.valid && addr >= block.start && addr <= block.end)
+		if (tmp.valid && addr >= tmp.start && addr <= tmp.end)
 			return i;
 	}
 
 	return -1;
 }
 
-int find_unsed_e_index(unsigned long addr, int size) {
-	int s_index = find_s_index(addr);
-	cache_line *tgt_set = cache[s_index];
+int find_unsed_e_idx(unsigned long addr, int size) {
+	int s_idx = get_s_idx(addr);
+	cache_blk *tgt_set = cache[s_idx];
 
-	for (int i = 0; i < E; i++)
+	for (int i = 0; i < E; ++i)
 		if (!tgt_set[i].valid)
 			return i;
 
 	return -1;
 }
 
-char *save_data(unsigned long addr, int size) {
+char *save(unsigned long addr, int size) {
 	char *res;
-	int s_index = find_s_index(addr);
-	int e_index = find_e_index(addr, size);
+	int s_idx = get_s_idx(addr);
+	int e_idx = get_e_idx(addr, size);
 
-	if (e_index == -1) {
+	if (e_idx == -1) {
 		res = "miss";
 		m += 1;
 	}
@@ -83,35 +85,35 @@ char *save_data(unsigned long addr, int size) {
 		res = "hit";
 		h += 1;
 
-		revise(s_index, e_index, addr);
+		revise(s_idx, e_idx, addr);
 	}
 
 	return res;
 }
 
-char *load_data(unsigned long addr, int size) {
+char *load(unsigned long addr, int size) {
 	char *res;
-	int s_index = find_s_index(addr);
-	int e_index = find_e_index(addr, size);
+	int s_idx = get_s_idx(addr);
+	int e_idx = get_e_idx(addr, size);
 
-	if (e_index != -1) {
+	if (e_idx != -1) {
 		res = "hit";
 		h += 1;
 	}
 	else {
-		e_index = find_unsed_e_index(addr, size);
-		if (e_index != -1) {
+		e_idx = find_unsed_e_idx(addr, size);
+		if (e_idx != -1) {
 			res = "miss";
 			m += 1;
 		}
 		else {
-			cache_line *tgt_set = cache[s_index];
-			e_index = 0;
+			cache_blk *tgt_set = cache[s_idx];
+			e_idx = 0;
 			for (int i = 0; i < E; i++) {
-				cache_line block = tgt_set[i];
+				cache_blk tmp = tgt_set[i];
 
-				if (tgt_set[e_index].lru > block.lru)
-					e_index = i;
+				if (tgt_set[e_idx].lru > tmp.lru)
+					e_idx = i;
 			}
 			res = "miss eviction";
 			m += 1;
@@ -119,26 +121,26 @@ char *load_data(unsigned long addr, int size) {
 		}
 	}
 
-	revise(s_index, e_index, addr);
+	revise(s_idx, e_idx, addr);
 	return res;
 }
 
 void cache_instr(char id, unsigned long addr, int size) {
 	switch (id) {
 		case 'S': {
-			char *res = load_data(addr, size);
+			char *res = load(addr, size);
 			if (v)
 				printf("%c %lx,%d %s \n", id, addr, size, res);
 			break;
 		}
 		case 'M': {
-			char *load = load_data(addr, size), *save = save_data(addr, size);
+			char *l = load(addr, size), *s = save(addr, size);
 			if (v)
-				printf("%c %lx,%d %s %s \n", id, addr, size, load, save);
+				printf("%c %lx,%d %s %s \n", id, addr, size, l, s);
 			break;
 		}
 		case 'L': {
-			char *res = load_data(addr, size);
+			char *res = load(addr, size);
 			if (v)
 				printf("%c %lx,%d %s \n", id, addr, size, res);
 			break;
@@ -148,7 +150,7 @@ void cache_instr(char id, unsigned long addr, int size) {
 }
 
 void usage() {
-	char *usage =
+	char *help =
 		"Usage: ./csim [-hv] -s <num> -E <num> -b <num> -t <file>\n\
 		Options:\n\
 		-h         Print this help message.\n\
@@ -161,7 +163,7 @@ void usage() {
 		Examples:\n\
 		linux>  ./csim -s 4 -E 1 -b 4 -t traces/yi.trace \n\
 		linux>  ./csim -v -s 8 -E 2 -b 4 -t traces/yi.trace";
-	printf("%s\n", usage);
+	printf("%s\n", help);
 }
 
 int main(int argc, char **argv) {
@@ -209,9 +211,9 @@ int main(int argc, char **argv) {
 	S = pow(2.0, (float)s);
 	B = pow(2.0, (float)b);
 
-	cache = malloc(S * sizeof(cache_line *));
+	cache = malloc(S * sizeof(cache_blk *));
 	for(int i = 0; i < S; ++i)
-		cache[i] = malloc( E * sizeof(cache_line));
+		cache[i] = malloc( E * sizeof(cache_blk));
 
 	for(int i = 0; i < S ; ++i)
 		for(int j = 0; j < E; ++j)
