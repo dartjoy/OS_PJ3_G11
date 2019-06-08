@@ -61,7 +61,7 @@ int get_e_idx(unsigned long addr, int size) {
 	return -1;
 }
 
-int find_unsed_e_idx(unsigned long addr, int size) {
+int get_unused_e_idx(unsigned long addr, int size) {
 	int s_idx = get_s_idx(addr);
 	cache_blk *tgt_set = cache[s_idx];
 
@@ -101,7 +101,7 @@ char *load(unsigned long addr, int size) {
 		h += 1;
 	}
 	else {
-		e_idx = find_unsed_e_idx(addr, size);
+		e_idx = get_unused_e_idx(addr, size);
 		if (e_idx != -1) {
 			res = "miss";
 			m += 1;
@@ -127,22 +127,17 @@ char *load(unsigned long addr, int size) {
 
 void cache_instr(char id, unsigned long addr, int size) {
 	switch (id) {
+		case 'L':
 		case 'S': {
-			char *res = load(addr, size);
+			char *l = load(addr, size);
 			if (v)
-				printf("%c %lx,%d %s \n", id, addr, size, res);
+				printf("%c %lx,%d %s \n", id, addr, size, l);
 			break;
 		}
 		case 'M': {
 			char *l = load(addr, size), *s = save(addr, size);
 			if (v)
 				printf("%c %lx,%d %s %s \n", id, addr, size, l, s);
-			break;
-		}
-		case 'L': {
-			char *res = load(addr, size);
-			if (v)
-				printf("%c %lx,%d %s \n", id, addr, size, res);
 			break;
 		}
 	}
@@ -229,6 +224,7 @@ int main(int argc, char **argv) {
 
 	for(int i = 0; i < S; ++i)
 		free(cache[i]);
+	free(cache);
 
 	fclose(fp);
 	printSummary(h, m, e);
